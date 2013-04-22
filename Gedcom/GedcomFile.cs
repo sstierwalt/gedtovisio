@@ -103,28 +103,30 @@ namespace GedToVisio.Gedcom
 
         private void ProcessLevel1(string[] lineArray)
         {
+            var s1 = lineArray[1];
+            var s2 = lineArray.Length > 2 ? lineArray[2] : "";
             if (_currentRecord == GedcomRecordEnum.Header)
             {
-                switch (lineArray[1])
+                switch (s1)
                 {
                     case "SOUR":
-                        _header.Source = lineArray[2];
+                        _header.Source = s2;
                         _currentSubRecord = GedcomSubRecordEnum.HeaderSource;
                         break;
                     case "DEST":
-                        _header.Destination = lineArray[2];
+                        _header.Destination = s2;
                         _currentSubRecord = GedcomSubRecordEnum.None;
                         break;
                     case "DATE":
-                        _header.Date = lineArray[2];
+                        _header.Date = s2;
                         _currentSubRecord = GedcomSubRecordEnum.None;
                         break;
                     case "FILE":
-                        _header.File = lineArray[2];
+                        _header.File = s2;
                         _currentSubRecord = GedcomSubRecordEnum.None;
                         break;
                     case "CHAR":
-                        _header.CharacterEncoding = lineArray[2];
+                        _header.CharacterEncoding = s2;
                         _currentSubRecord = GedcomSubRecordEnum.None;
                         break;
                     case "GEDC":
@@ -134,18 +136,18 @@ namespace GedToVisio.Gedcom
             }
             else if (_currentRecord == GedcomRecordEnum.Individual)
             {
-                switch (lineArray[1])
+                switch (s1)
                 {
                     case "_UID":
-                        _currentIndividual.Uid = lineArray[2];
+                        _currentIndividual.Uid = s2;
                         _currentSubRecord = GedcomSubRecordEnum.None;
                         break;
                     case "NAME":
-                        _currentIndividual.GivenName = lineArray[2];
+                        _currentIndividual.GivenName = s2;
                         _currentSubRecord = GedcomSubRecordEnum.IndividualName;
                         break;
                     case "SEX":
-                        _currentIndividual.Sex = lineArray[2];
+                        _currentIndividual.Sex = s2;
                         _currentSubRecord = GedcomSubRecordEnum.None;
                         break;
                     case "BIRT":
@@ -155,62 +157,62 @@ namespace GedToVisio.Gedcom
                         _currentSubRecord = GedcomSubRecordEnum.IndividualDeath;
                         break;
                     case "OCCU":
-                        _currentIndividual.Occupation = lineArray[2];
+                        _currentIndividual.Occupation = s2;
                         _currentSubRecord = GedcomSubRecordEnum.None;
                         break;
                     case "DSCR":
-                        _currentIndividual.Description = lineArray[2];
+                        _currentIndividual.Description = s2;
                         _currentSubRecord = GedcomSubRecordEnum.None;
                         break;
                     case "NATI":
-                        _currentIndividual.Nationality = lineArray[2];
+                        _currentIndividual.Nationality = s2;
                         _currentSubRecord = GedcomSubRecordEnum.None;
                         break;
                     case "NOTE":
-                        _currentIndividual.Notes.Add(lineArray[2]);
+                        _currentIndividual.Notes.Add(s2);
                         _currentSubRecord = GedcomSubRecordEnum.None;
                         break;
                 }
             }
             else if (_currentRecord == GedcomRecordEnum.Family)
             {
-                switch (lineArray[1])
+                switch (s1)
                 {
                     case "_UID":
-                        _currentFamily.Uid = lineArray[2];
+                        _currentFamily.Uid = s2;
                         _currentSubRecord = GedcomSubRecordEnum.None;
                         break;
                     case "HUSB":
-                        _currentFamily.HusbandId = lineArray[2];
+                        _currentFamily.HusbandId = s2;
                         _currentSubRecord = GedcomSubRecordEnum.None;
                         break;
                     case "WIFE":
-                        _currentFamily.WifeId = lineArray[2];
+                        _currentFamily.WifeId = s2;
                         _currentSubRecord = GedcomSubRecordEnum.None;
                         break;
                     case "CHIL":
-                        _currentFamily.Children.Add(lineArray[2]);
+                        _currentFamily.Children.Add(s2);
                         _currentSubRecord = GedcomSubRecordEnum.None;
                         break;
                     case "MARR":
                         _currentSubRecord = GedcomSubRecordEnum.FamilyMarriage;
                         break;
                     case "NOTE":
-                        _currentFamily.Notes.Add(lineArray[2]);
+                        _currentFamily.Notes.Add(s2);
                         _currentSubRecord = GedcomSubRecordEnum.None;
                         break;
                 }
             }
             else if (_currentRecord == GedcomRecordEnum.Note)
             {
-                switch (lineArray[1])
+                switch (s1)
                 {
                     case "CONC":
-                        _currentNote.Text = lineArray.Length > 2 ? lineArray[2] : "";
+                        _currentNote.Text = s2;
                         _currentSubRecord = GedcomSubRecordEnum.None;
                         break;
                     case "CONT":
-                        _currentNote.Text += lineArray[2];
+                        _currentNote.Text += s2;
                         _currentSubRecord = GedcomSubRecordEnum.None;
                         break;
                 }

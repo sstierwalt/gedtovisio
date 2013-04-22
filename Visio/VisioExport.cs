@@ -10,15 +10,13 @@ namespace GedToVisio.Visio
     public class VisioExport
     {
         private readonly List<VisualObject> _visualObjects = new List<VisualObject>();
-        readonly Page _page;
         readonly Random _rand = new Random();
+        readonly VisioRenderer _renderer;
 
 
         public VisioExport()
         {
-            var application = new Microsoft.Office.Interop.Visio.Application();
-            application.Documents.Add("");
-            _page = application.Documents[1].Pages[1];
+            _renderer = new VisioRenderer();
         }
 
 
@@ -77,39 +75,90 @@ namespace GedToVisio.Visio
         /// </summary>
         public void Arrange()
         {
-            // arrange X
+            // arrange X on 1x1 grid
             CalcLevel();
-
-            foreach (var visualObject in _visualObjects)
-            {
-                visualObject.X = 10 - visualObject.Level * 2;
-            }
+            _visualObjects.ForEach(o => o.X = o.Level);
 
 
-            // arrange Y
+            // arrange Y on 1x1 grid
             var visualObjects = _visualObjects.OrderBy(o => o.Level).ToList();
 
-            foreach (var visualObject in _visualObjects)
+
+            foreach (var visualObject in visualObjects)
             {
-                visualObject.Y = _rand.NextDouble() * 11;
+                var childCount = visualObject.Children.Count;
+                for (int i = 0; i < childCount; i++)
+                {
+                    visualObject.Children[i].Y = visualObject.Y + i;
+                }
             }
 
-            foreach (var visualObject in _visualObjects)
+            foreach (var visualObject in visualObjects.OrderByDescending(o => o.Level))
             {
-                if (visualObject.Husband != null)
+                var husb = visualObject.Husband;
+                var wife = visualObject.Wife;
+                if (husb == null || wife == null)
                 {
-                    visualObject.Husband.Y = visualObject.Y + 1;
+                    continue;
                 }
 
-                if (visualObject.Wife != null)
+                if (husb.Y == wife.Y)
                 {
-                    visualObject.Wife.Y = visualObject.Y - 1;
+                    husb.Y = visualObject.Y + 1;
+                    wife.Y = visualObject.Y - 1;
+                }
+            }
+
+            var cost = Cost();
+            Render();
+
+            for (int i = 0; i < 10000; i++)
+            {
+                // random objects to move
+                var objects = new List<VisualObject>();
+                var n = 2;
+                for (int j = 0; j < n; j++)
+                {
+                    // random object
+                    var o = _visualObjects[_rand.Next(_visualObjects.Count)];
+                    // save position
+                    o.OrigY = o.Y;
+                    // random move
+                    o.Y += _rand.Next(11) - 5;
+
+                    objects.Add(o);
+                }
+
+                var newCost = Cost();
+                if (cost > newCost)
+                {
+                    // apply
+                    cost = newCost;
+                    objects.ForEach(o => _renderer.Move(o.Shape, o.X, o.Y));
+                }
+                else
+                {
+                    // undo
+                    objects.ForEach(o => o.Y = o.OrigY);
                 }
             }
         }
 
 
+        double Cost()
+        {
+            // штраф за совпадающие позиции
+            int overlappingCount = _visualObjects.Sum(visualObject => _visualObjects.Count(o => o.X == visualObject.X && o.Y == visualObject.Y && o != visualObject))/2;
 
+            // длинна связей
+            double len = _visualObjects.Sum(o => o.Children.Sum(c => Math.Sqrt((c.X - o.X)*(c.X - o.X) + (c.Y - o.Y)*(c.Y - o.Y))));
+            return overlappingCount * 10 + len;
+        }
+
+
+        /// <summary>
+        /// Определяет уровни дерева, соответствующие поколениям (и семьям).
+        /// </summary>
         public void CalcLevel()
         {
             bool hasChanges;
@@ -154,82 +203,25 @@ namespace GedToVisio.Visio
         {
             foreach (var visualObject in _visualObjects.Where(o => o.GedcomObject is Individual))
             {
-                var shape = Render(visualObject.GedcomObject, visualObject.X, visualObject.Y);
+                var shape = _renderer.Render(visualObject.GedcomObject, visualObject.X, visualObject.Y);
                 visualObject.Shape = shape;               
             }
 
             foreach (var visualObject in _visualObjects.Where(o => o.GedcomObject is Family))
             {
-                var shape = Render(visualObject.GedcomObject, visualObject.X, visualObject.Y);
+                var shape = _renderer.Render(visualObject.GedcomObject, visualObject.X, visualObject.Y);
                 visualObject.Shape = shape;
                 foreach (var parent in visualObject.Parents)
                 {
-                    VisioHelper.ConnectWithDynamicGlueAndConnector(shape, parent.Shape);
+                    _renderer.Connect(shape, parent.Shape);
                 }
 
                 foreach (var children in visualObject.Children)
                 {
-                    VisioHelper.ConnectWithDynamicGlueAndConnector(shape, children.Shape);
+                    _renderer.Connect(shape, children.Shape);
                 }
-
             }
         }
 
-    
-        Shape Render(object o, double x, double y)
-        {
-            if (o is Individual)
-            {
-                return Render((Individual) o, x, y);
-            }
-
-            if (o is Family)
-            {
-                return Render((Family) o, x, y);
-            }
-            throw new ArgumentException();
-        }
-
-
-        Shape Render(Individual indi, double x, double y)
-        {
-            var height = 0.5;
-            var width = 1.7;
-
-            var shape = _page.DrawRectangle(x - width / 2, y - height / 2, x + width / 2, y + height / 2);
-            shape.Text = string.Format("{0} /{1}/\n{2} - {3}", indi.GivenName, indi.Surname, indi.BirthDate, indi.DiedDate);
-
-            shape.Characters.CharProps[(short)VisCellIndices.visCharacterSize] = 10;
-            if (indi.Sex == "F")
-            {
-                shape.CellsU["Rounding"].FormulaU = ".2";
-            }
-
-            VisioHelper.SetCustomProperty(shape, "_UID", "Unique Identification Number", indi.Uid);
-            VisioHelper.SetCustomProperty(shape, "ID", "gedcom ID", indi.Id);
-            VisioHelper.SetCustomProperty(shape, "GivenName", indi.GivenName);
-            VisioHelper.SetCustomProperty(shape, "Surname", indi.Surname);
-            VisioHelper.SetCustomProperty(shape, "Sex", indi.Sex);
-            VisioHelper.SetCustomProperty(shape, "BirthDate", indi.BirthDate);
-            VisioHelper.SetCustomProperty(shape, "DiedDate", indi.DiedDate);
-            return shape;
-        }
-
-
-        Shape Render(Family fam, double x, double y)
-        {
-            var height = 0.4;
-            var width = 0.8;
-
-            var shape = _page.DrawOval(x - width / 2, y - height / 2, x + width / 2, y + height / 2);
-            shape.Text = string.Format("{0}", fam.MarriageDate);
-            shape.Characters.CharProps[(short)VisCellIndices.visCharacterSize] = 8;
-
-            VisioHelper.SetCustomProperty(shape, "_UID", "Unique Identification Number", fam.Uid);
-            VisioHelper.SetCustomProperty(shape, "ID", "gedcom ID", fam.Id);
-            VisioHelper.SetCustomProperty(shape, "MarriageDate", fam.MarriageDate);
-
-            return shape;
-        }
     }
 }

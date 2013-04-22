@@ -10,9 +10,15 @@ namespace GedToVisio.Visio
     public class VisualObject
     {
         public string Id { get; set; }
+
+        /// <summary>
+        /// Уровень в дереве, начиная от корня
+        /// </summary>
         public int Level { get; set; }
-        public double X { get; set; }
-        public double Y { get; set; }
+
+        public int X { get; set; }
+        public int Y { get; set; }
+        public int OrigY { get; set; }
         public Shape Shape { get; set; }
         public Gedcom.GedcomObject GedcomObject { get; set; }
 
@@ -31,19 +37,24 @@ namespace GedToVisio.Visio
         public VisualObject Wife { get; set; }
 
 
+        string IndiStr(Individual indi)
+        {
+            return string.Format("{0} {1}", indi.GivenName, indi.Surname);
+        }
+
         public override string ToString()
         {
             string s;
             var indi = GedcomObject as Individual;
             if (indi != null)
             {
-                s = string.Format("{0} {1}", indi.GivenName, indi.Surname);
+                s = IndiStr(indi);
             }
             else
             {
-                s = string.Join(" - ", Parents.Select(p => (Individual) p.GedcomObject).Select(p => string.Format("{0} {1}", p.GivenName, p.Surname)));
+                s = string.Join(" - ", Parents.Select(p => (Individual)p.GedcomObject).Select(IndiStr));
             }
-            return string.Format("{0} {1}", Level, s);
+            return string.Format("[{0}] {1} {2} {3}", Level, X, Y, s);
         }
     }
 }

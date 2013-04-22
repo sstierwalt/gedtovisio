@@ -21,7 +21,7 @@ namespace GedToVisio
 
             visioExport.Arrange();
 
-            visioExport.Render();
+            //visioExport.Render();
         }
     }
 }
