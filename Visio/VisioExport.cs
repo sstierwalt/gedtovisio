@@ -81,67 +81,122 @@ namespace GedToVisio.Visio
 
 
             // arrange Y on 1x1 grid
-            var visualObjects = _visualObjects.OrderBy(o => o.Level).ToList();
 
+            var groups = _visualObjects.GroupBy(o => o.Level).OrderBy(g => g.Key).ToList();
 
-            foreach (var visualObject in visualObjects)
+            // individuals
+            foreach (var levelGroupIndi in groups.Where(o => o.First().GedcomObject is Individual))
             {
-                var childCount = visualObject.Children.Count;
-                for (int i = 0; i < childCount; i++)
+                // люди, у которых есть семья, где они родились
+                var visualObjectsFromFam = levelGroupIndi.Where(o => o.Parents.Any()).OrderBy(o => o.Parents.Single().Id).ToList();
+                // люди, у которых нет информации о семье, где они родились
+                var visualObjectsNoFam = levelGroupIndi.Where(o => !o.Parents.Any()).ToList();
+
+                int y = 0;
+                foreach (var visualObject in visualObjectsFromFam)
                 {
-                    visualObject.Children[i].Y = visualObject.Y + i;
+                    visualObject.Y = y++;
+                }
+
+                foreach (var visualObject in visualObjectsNoFam)
+                {
+                    // семья, которую они создали
+                    var family = visualObject.Children.FirstOrDefault();
+                    if (family == null)
+                    {
+                        visualObject.Y = y++;
+                        continue;
+                    }
+                    // супруг
+                    var spouse = family.Parents.FirstOrDefault(o => o != visualObject);
+                    if (spouse == null)
+                    {
+                        visualObject.Y = y++;
+                        continue;
+                    }
+                    visualObject.Y = spouse.Y + 1;
+                    foreach (var o in levelGroupIndi.Where(o => o.Y >= visualObject.Y && o != visualObject))
+                    {
+                        o.Y++;
+                    }
+                    y++;
                 }
             }
 
-            foreach (var visualObject in visualObjects.OrderByDescending(o => o.Level))
-            {
-                var husb = visualObject.Husband;
-                var wife = visualObject.Wife;
-                if (husb == null || wife == null)
-                {
-                    continue;
-                }
 
-                if (husb.Y == wife.Y)
+            // family
+            foreach (var levelGroupFam in groups.Where(o => o.First().GedcomObject is Family))
+            {
+                foreach (var visualObject in levelGroupFam)
                 {
-                    husb.Y = visualObject.Y + 1;
-                    wife.Y = visualObject.Y - 1;
+                    if (visualObject.Children.Any())
+                    {
+                        visualObject.Y = (int)visualObject.Children.Average(o => o.Y);
+                    }
                 }
             }
 
-            var cost = Cost();
+            //var visualObjects = _visualObjects.OrderBy(o => o.Level).ToList();
+
+
+            //foreach (var visualObject in visualObjects)
+            //{
+            //    var childCount = visualObject.Children.Count;
+            //    for (int i = 0; i < childCount; i++)
+            //    {
+            //        visualObject.Children[i].Y = visualObject.Y + i;
+            //    }
+            //}
+
+            //foreach (var visualObject in visualObjects.OrderByDescending(o => o.Level))
+            //{
+            //    var husb = visualObject.Husband;
+            //    var wife = visualObject.Wife;
+            //    if (husb == null || wife == null)
+            //    {
+            //        continue;
+            //    }
+
+            //    if (husb.Y == wife.Y)
+            //    {
+            //        husb.Y = visualObject.Y + 1;
+            //        wife.Y = visualObject.Y - 1;
+            //    }
+            //}
+
             Render();
 
-            for (int i = 0; i < 10000; i++)
-            {
-                // random objects to move
-                var objects = new List<VisualObject>();
-                var n = 2;
-                for (int j = 0; j < n; j++)
-                {
-                    // random object
-                    var o = _visualObjects[_rand.Next(_visualObjects.Count)];
-                    // save position
-                    o.OrigY = o.Y;
-                    // random move
-                    o.Y += _rand.Next(11) - 5;
+            //var cost = Cost();
+            //for (int i = 0; i < 10000; i++)
+            //{
+            //    // random objects to move
+            //    var objects = new List<VisualObject>();
+            //    var n = 2;
+            //    for (int j = 0; j < n; j++)
+            //    {
+            //        // random object
+            //        var o = _visualObjects[_rand.Next(_visualObjects.Count)];
+            //        // save position
+            //        o.OrigY = o.Y;
+            //        // random move
+            //        o.Y += _rand.Next(11) - 5;
 
-                    objects.Add(o);
-                }
+            //        objects.Add(o);
+            //    }
 
-                var newCost = Cost();
-                if (cost > newCost)
-                {
-                    // apply
-                    cost = newCost;
-                    objects.ForEach(o => _renderer.Move(o.Shape, o.X, o.Y));
-                }
-                else
-                {
-                    // undo
-                    objects.ForEach(o => o.Y = o.OrigY);
-                }
-            }
+            //    var newCost = Cost();
+            //    if (cost > newCost)
+            //    {
+            //        // apply
+            //        cost = newCost;
+            //        objects.ForEach(o => _renderer.Move(o.Shape, o.X, o.Y));
+            //    }
+            //    else
+            //    {
+            //        // undo
+            //        objects.ForEach(o => o.Y = o.OrigY);
+            //    }
+            //}
         }
 
 
@@ -163,10 +218,10 @@ namespace GedToVisio.Visio
         {
             bool hasChanges;
 
-            // "раздвигаем" перекрывающиеся уровни
             do
             {
                 hasChanges = false;
+                // "раздвигаем" перекрывающиеся уровни
                 foreach (var o in _visualObjects)
                 {
                     var clildLevel = o.Level + 1;
@@ -176,25 +231,19 @@ namespace GedToVisio.Visio
                         hasChanges = true;
                     }
                 }
-                
-            } while (hasChanges);
-
-            // "придвигаем" объекты, которые отстоят слишком далеко от детей
-            do
-            {
-                hasChanges = false;
+                // "придвигаем" объекты, которые отстоят слишком далеко от детей
                 foreach (var o in _visualObjects)
                 {
                     if (o.Children.Any())
                     {
-                        var level = o.Children.Min(c => c.Level) - 1;
+                        var level = o.Children.Max(c => c.Level) - 1;
                         if (level > o.Level)
                         {
                             o.Level = level;
                             hasChanges = true;
                         }
                     }
-                }
+                }                
             } while (hasChanges);
         }
 

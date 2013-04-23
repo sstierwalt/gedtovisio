@@ -21,13 +21,21 @@ namespace GedToVisio.Visio
 
         private static double ScaleY(int y)
         {
-            return 6.0 + y;
+            return 1.0 + y;
         }
 
 
         public VisioRenderer()
         {
-            var application = new Microsoft.Office.Interop.Visio.Application();
+            Application application;
+            try
+            {
+                application = new Microsoft.Office.Interop.Visio.Application();
+            }
+            catch (System.Runtime.InteropServices.COMException ex)
+            {                
+                throw new Exception("MS Visio not found", ex);
+            }
             application.Documents.Add("");
             _page = application.Documents[1].Pages[1];            
         }
