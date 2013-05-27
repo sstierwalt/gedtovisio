@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using GedToVisio.Gedcom;
 using Microsoft.Office.Interop.Visio;
 
@@ -136,36 +137,42 @@ namespace GedToVisio.Visio
                 }
             }
 
-            //var visualObjects = _visualObjects.OrderBy(o => o.Level).ToList();
-
-
-            //foreach (var visualObject in visualObjects)
-            //{
-            //    var childCount = visualObject.Children.Count;
-            //    for (int i = 0; i < childCount; i++)
-            //    {
-            //        visualObject.Children[i].Y = visualObject.Y + i;
-            //    }
-            //}
-
-            //foreach (var visualObject in visualObjects.OrderByDescending(o => o.Level))
-            //{
-            //    var husb = visualObject.Husband;
-            //    var wife = visualObject.Wife;
-            //    if (husb == null || wife == null)
-            //    {
-            //        continue;
-            //    }
-
-            //    if (husb.Y == wife.Y)
-            //    {
-            //        husb.Y = visualObject.Y + 1;
-            //        wife.Y = visualObject.Y - 1;
-            //    }
-            //}
 
             Render();
 
+            // random optimize
+            {
+                bool hasChanges;
+
+                do
+                {
+                    hasChanges = false;
+                    var cost = Cost();
+                    foreach (var visualObject in _visualObjects)
+                    {
+                        var oldY = visualObject.Y;
+                        //visualObject.Y++;
+                        visualObject.Y += _rand.Next(5);
+                        var newCost = Cost();
+                        if (cost > newCost)
+                        {
+                            // apply
+                            cost = newCost;
+                            hasChanges = true;
+                            _renderer.Move(visualObject.Shape, visualObject.X, visualObject.Y);
+                            Thread.Sleep(300);
+                        }
+                        else
+                        {
+                            // undo
+                            visualObject.Y = oldY;
+                        }
+                    }
+                } while (hasChanges);
+            }
+
+
+            //// optimize 2 (disabled)
             //var cost = Cost();
             //for (int i = 0; i < 10000; i++)
             //{
@@ -213,6 +220,8 @@ namespace GedToVisio.Visio
 
         /// <summary>
         /// Определяет уровни дерева, соответствующие поколениям (и семьям).
+        /// Для циклических графов (например, если жениться на дочери своей жены), возможно зацикливание.
+        /// Но у меня таких данных нет :)
         /// </summary>
         public void CalcLevel()
         {
@@ -262,12 +271,12 @@ namespace GedToVisio.Visio
                 visualObject.Shape = shape;
                 foreach (var parent in visualObject.Parents)
                 {
-                    _renderer.Connect(shape, parent.Shape);
+                    _renderer.Connect(shape, VisioRenderer.ConnectionPoint.Center,  parent.Shape, VisioRenderer.ConnectionPoint.Left);
                 }
 
                 foreach (var children in visualObject.Children)
                 {
-                    _renderer.Connect(shape, children.Shape);
+                    _renderer.Connect(shape, VisioRenderer.ConnectionPoint.Center,  children.Shape, VisioRenderer.ConnectionPoint.Rigth);
                 }
             }
         }

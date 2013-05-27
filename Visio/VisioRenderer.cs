@@ -12,6 +12,13 @@ namespace GedToVisio.Visio
     /// </summary>
     public class VisioRenderer
     {
+        public enum ConnectionPoint
+        {
+            Left = 0,
+            Rigth = 1,
+            Center = -1
+        }
+
         readonly Page _page;
 
         private static double ScaleX(int x)
@@ -56,9 +63,10 @@ namespace GedToVisio.Visio
         }
 
 
-        public void Connect(Shape shape1, Shape shape2)
+        public void Connect(Shape shapeFrom, ConnectionPoint shapeFromConnectionPoint, Shape shapeTo, ConnectionPoint shapeToConnectionPoint)
         {
-            VisioHelper.ConnectWithDynamicGlueAndConnector(shape1, shape2);
+            VisioHelper.Connect(shapeFrom, shapeFromConnectionPoint == ConnectionPoint.Center ? null : (short?)shapeFromConnectionPoint, 
+                shapeTo, shapeToConnectionPoint == ConnectionPoint.Center ? null : (short?)shapeToConnectionPoint);
         }
 
 
@@ -73,8 +81,16 @@ namespace GedToVisio.Visio
             const double height = 0.5;
             const double width = 1.7;
 
-            var shape = _page.DrawRectangle(x - width / 2, y - height / 2, x + width / 2, y + height / 2);
-            shape.Text = string.Format("{0} /{1}/\n{2} - {3}", indi.GivenName, indi.Surname, indi.BirthDate, indi.DiedDate);
+            //var shape = _page.DrawRectangle(x - width / 2, y - height / 2, x + width / 2, y + height / 2);
+            var shape = VisioHelper.DrawRectangle(_page, x - width / 2, y - height / 2, x + width / 2, y + height / 2);
+            
+            var notes = string.Join("\n", indi.Notes);
+            shape.Text = string.Format("{0}{1}\n{2}{3}", indi.GivenName,
+                string.IsNullOrEmpty(indi.Surname) ? "" : string.Format(" /{0}/", indi.Surname), 
+                string.IsNullOrEmpty(indi.BirthDate) && string.IsNullOrEmpty(indi.DiedDate) ? ""
+                    : string.Format("{0} - {1}", FormatDate(indi.BirthDate), FormatDate(indi.DiedDate)),
+                string.IsNullOrEmpty(notes) ? "" : "\n" + notes
+                );
 
             shape.Characters.CharProps[(short)VisCellIndices.visCharacterSize] = 10;
             if (indi.Sex == "F")
@@ -89,10 +105,10 @@ namespace GedToVisio.Visio
             VisioHelper.SetCustomProperty(shape, "Sex", indi.Sex);
             VisioHelper.SetCustomProperty(shape, "BirthDate", indi.BirthDate);
             VisioHelper.SetCustomProperty(shape, "DiedDate", indi.DiedDate);
+            VisioHelper.SetCustomProperty(shape, "Notes", notes);
 
             return shape;
         }
-
 
         Shape Render(Family fam, double x, double y)
         {
@@ -100,7 +116,7 @@ namespace GedToVisio.Visio
             const double width = 0.8;
 
             var shape = _page.DrawOval(x - width / 2, y - height / 2, x + width / 2, y + height / 2);
-            shape.Text = string.Format("{0}", fam.MarriageDate);
+            shape.Text = FormatDate(fam.MarriageDate);
             shape.Characters.CharProps[(short)VisCellIndices.visCharacterSize] = 8;
 
             VisioHelper.SetCustomProperty(shape, "_UID", "Unique Identification Number", fam.Uid);
@@ -108,6 +124,12 @@ namespace GedToVisio.Visio
             VisioHelper.SetCustomProperty(shape, "MarriageDate", fam.MarriageDate);
 
             return shape;
-        }    
+        }
+
+        private string FormatDate(string date)
+        {
+            return date == null ? null : date.Replace("ABT ", "~");
+        }
+
     }
 }
